@@ -21,6 +21,9 @@ from zentra import (
     WSHello,
     WSPing,
     WSMessageSend,
+    ConversationIDs,
+    ConversationMessages,
+    ConversationMessage,
 )
 
 app = FastAPI(
@@ -41,17 +44,17 @@ async def root(request: Request):
 
 @app.get(
     "/conversations/ids",
-    response_model=list[int],
+    response_model=ConversationIDs,
     tags=["API"],
     description="Fetch an array of all current conversation id's.",
 )
 async def fetch_conversation_ids():
-    return list(manager.conversation_history.keys())
+    return {"data": list(manager.conversation_history.keys())}
 
 
 @app.get(
     "/conversations/{conversation_id}/messages",
-    response_model=list[Message],
+    response_model=ConversationMessages,
     responses={404: {"model": Detail}},
     description="Fetch all messages for a given conversation.",
     tags=["API"],
@@ -65,12 +68,28 @@ async def fetch_messages(
     if not conversations:
         raise HTTPException(status_code=404, detail="Conversation does not exist.")
 
-    return conversations
+    return {"data": conversations}
+
+
+@app.get(
+    "/conversations/all/messages/latest",
+    response_model=ConversationMessages,
+    responses={404: {"model": Detail}},
+    description="Fetch the most recent message for all conversations.",
+    tags=["API"],
+)
+async def fetch_all_latest_messages():
+    data = []
+    for conversation in manager.conversation_history.values():
+        msg = conversation[-1]
+        data.append(msg)
+
+    return {"data": data}
 
 
 @app.get(
     "/conversations/{conversation_id}/messages/latest",
-    response_model=Message,
+    response_model=ConversationMessage,
     responses={404: {"model": Detail}},
     description="Fetch the most recent message for a given conversation.",
     tags=["API"],
@@ -84,23 +103,7 @@ async def fetch_latest_message(
     if not conversations:
         raise HTTPException(status_code=404, detail="Conversation does not exist.")
 
-    return conversations[-1]
-
-
-@app.get(
-    "/conversations/all/messages/latest",
-    response_model=list[Message],
-    responses={404: {"model": Detail}},
-    description="Fetch the most recent message for all conversations.",
-    tags=["API"],
-)
-async def fetch_latest_messages_for_conversations():
-    data = []
-    for conversation in manager.conversation_history.values():
-        msg = conversation[-1]
-        data.append(msg)
-
-    return data
+    return {"data": conversations[-1]}
 
 
 @app.post(
@@ -119,7 +122,7 @@ async def send_message(
     x_connection_id: int = Header(
         default=None, description="Your websocket connections id."
     ),
-    x_nonce: int = Header(
+    x_nonce: str = Header(
         default=None, description="Your websocket connections nonce."
     ),
 ):

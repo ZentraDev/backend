@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import Field, BaseModel
 
+from zentra import Message
+
 
 class Detail(BaseModel):
     detail: str = Field(description="Information on why this request failed.")
@@ -46,3 +48,17 @@ class WSMessageSendData(BaseModel):
 class WSMessageSend(BaseModel):
     type: Literal["NEW_MESSAGE"]
     data: WSMessageSendData
+
+
+class ConversationIDs(BaseModel):
+    data: list[int] = Field(description="A list of the current ids for conversations.")
+
+
+class ConversationMessages(BaseModel):
+    data: list[Message] = Field(
+        description="A list of the current messages for this action."
+    )
+
+
+class ConversationMessage(BaseModel):
+    data: Message = Field(description="The latest message for this conversation.")
