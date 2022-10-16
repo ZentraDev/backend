@@ -14,8 +14,8 @@ log = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
-        self._current_message_count: count = count(0)
-        self._connection_counter: count = count(0)
+        self._current_message_count: count = count(1)
+        self._connection_counter: count = count(1)
         self.active_connections: Dict[int, Connection] = {}
         self.conversation_history: Dict[int, list[Message]] = {}
 
