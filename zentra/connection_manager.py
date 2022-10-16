@@ -51,4 +51,4 @@ class ConnectionManager:
 
         for c in to_disconnect:
             self.disconnect(c)
-            print(f"INFO:    {c.id} disconnected")
+            print(f"INFO:     {c.id} disconnected")

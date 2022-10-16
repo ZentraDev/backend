@@ -248,6 +248,6 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
 
         except (WebSocketDisconnect, ConnectionClosedOK):
             manager.disconnect(connection)
-            print(f"INFO:    {connection.id} disconnected")
+            print(f"INFO:     {connection.id} disconnected")
     except Exception as e:
         raise e
