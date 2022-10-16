@@ -74,7 +74,6 @@ async def fetch_messages(
 @app.get(
     "/conversations/all/messages/latest",
     response_model=ConversationMessages,
-    responses={404: {"model": Detail}},
     description="Fetch the most recent message for all conversations.",
     tags=["API"],
 )
