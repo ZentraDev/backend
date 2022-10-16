@@ -9,6 +9,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_204_NO_CONTENT
 from starlette.templating import Jinja2Templates
 from starlette.websockets import WebSocketDisconnect, WebSocket
+from websockets.exceptions import ConnectionClosedOK
 
 from zentra import (
     ConnectionManager,
@@ -86,6 +87,22 @@ async def fetch_latest_message(
     return conversations[-1]
 
 
+@app.get(
+    "/conversations/all/messages/latest",
+    response_model=list[Message],
+    responses={404: {"model": Detail}},
+    description="Fetch the most recent message for all conversations.",
+    tags=["API"],
+)
+async def fetch_latest_messages_for_conversations():
+    data = []
+    for conversation in manager.conversation_history.values():
+        msg = conversation[-1]
+        data.append(msg)
+
+    return data
+
+
 @app.post(
     "/conversations/{conversation_id}/messages",
     status_code=HTTP_204_NO_CONTENT,
@@ -99,13 +116,15 @@ async def send_message(
     conversation_id: int = Path(
         description="The ID of the conversation you wish to send this message to."
     ),
-    connection_id: int = Header(
+    x_connection_id: int = Header(
         default=None, description="Your websocket connections id."
     ),
-    nonce: int = Header(default=None, description="Your websocket connections nonce."),
+    x_nonce: int = Header(
+        default=None, description="Your websocket connections nonce."
+    ),
 ):
-    connection: Connection | None = manager.active_connections.get(connection_id)
-    if not connection or (connection and connection.nonce != nonce):
+    connection: Connection | None = manager.active_connections.get(x_connection_id)
+    if not connection or (connection and connection.nonce != x_nonce):
         raise HTTPException(status_code=401, detail="Invalid header credentials.")
 
     message: Message = Message(
@@ -225,7 +244,7 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
 
                 current_ack += 1
 
-        except WebSocketDisconnect:
+        except (WebSocketDisconnect, ConnectionClosedOK):
             manager.disconnect(connection)
             print(f"INFO:    {connection.id} disconnected")
     except Exception as e:
