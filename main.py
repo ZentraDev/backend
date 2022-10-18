@@ -63,7 +63,13 @@ async def root(request: Request):
 
 @app.get("/expose")
 async def expose(request: Request):
-    return JSONResponse(status_code=200, content={"request_ip": request.client.host})
+    return JSONResponse(
+        status_code=200,
+        content={
+            "request_ip": request.client.host,
+            "X-Forwarded-For": request.headers.get("X-Forwarded-For"),
+        },
+    )
 
 
 @app.get(
