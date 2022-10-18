@@ -33,7 +33,9 @@ app = FastAPI(
     title="Zentra Backend",
     description="Messages are sorted in order based on ID, "
     "that is a message with an ID of 5 is newer then a message with an ID of 4.\n\n"
-    "Message ID's are generated globally and not per conversation.",
+    "Message ID's are generated globally and not per conversation.\n\n"
+    "**Global Rate-limit**\n\nAll requests are rate-limited globally by client IP and "
+    "are throttled to 25 requests every 10 seconds.",
     responses={
         429: {
             "model": RateLimited,
@@ -148,7 +150,9 @@ async def fetch_latest_message(
     status_code=HTTP_204_NO_CONTENT,
     responses={401: {"model": Detail}},
     description="Send a new message out to all connected clients.\n\n"
-    "It is up to the connected clients to decide if they wish to display it.",
+    "It is up to the connected clients to decide if they wish to display it.\n\n"
+    "**Route specific rate-limits**\n\nThis route is also throttled at 10 requests "
+    "every 5 seconds per connected websocket client.",
     tags=["API"],
 )
 async def send_message(
