@@ -42,7 +42,6 @@ app = FastAPI(
     },
 )
 templates = Jinja2Templates(directory="templates")
-# app.mount("/static", StaticFiles(directory="static"), name="static")
 manager = ConnectionManager()
 
 
@@ -79,17 +78,6 @@ async def ratelimit_routes(request: Request, call_next):
 @app.get("/", include_in_schema=False)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/expose")
-async def expose(request: Request):
-    return JSONResponse(
-        status_code=200,
-        content={
-            "request_ip": request.client.host,
-            "X-Forwarded-For": request.headers.get("X-Forwarded-For"),
-        },
-    )
 
 
 @app.get(
@@ -176,7 +164,7 @@ async def send_message(
     ),
 ):
     # Message sending should have a harser ratelimit
-    # This is per connect client rather then IP as each 'person' should
+    # This is per connect client rather than IP as each 'person' should
     # in theory only be able to send so many messages at once
     async with authenticated_ratelimit(x_nonce, x_connection_id):
         connection: Connection | None = manager.active_connections.get(x_connection_id)
