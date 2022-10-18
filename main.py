@@ -27,7 +27,8 @@ from zentra import (
     RateLimited,
 )
 
-authenticated_cooldown = Cooldown(10, 5, CooldownBucket.args)
+global_ratelimit = Cooldown(25, 10, CooldownBucket.args)
+authenticated_ratelimit = Cooldown(10, 5, CooldownBucket.args)
 app = FastAPI(
     title="Zentra Backend",
     description="Messages are sorted in order based on ID, "
@@ -54,6 +55,25 @@ async def route_on_cooldown(request: Request, exc: CallableOnCooldown):
             "resets_at": exc.resets_at.isoformat(),
         },
     )
+
+
+@app.middleware("http")
+async def ratelimit_routes(request: Request, call_next):
+    """Ensures all routes come under the global ratelimit"""
+    x_forwarded_for = request.headers.get("X-Forwarded-For", 1)
+    try:
+        async with global_ratelimit(x_forwarded_for):
+            response = await call_next(request)
+    except CallableOnCooldown as exc:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "retry_after": exc.retry_after,
+                "resets_at": exc.resets_at.isoformat(),
+            },
+        )
+
+    return response
 
 
 @app.get("/", include_in_schema=False)
@@ -155,7 +175,10 @@ async def send_message(
         default=None, description="Your websocket connections nonce."
     ),
 ):
-    async with authenticated_cooldown(x_nonce, x_connection_id):
+    # Message sending should have a harser ratelimit
+    # This is per connect client rather then IP as each 'person' should
+    # in theory only be able to send so many messages at once
+    async with authenticated_ratelimit(x_nonce, x_connection_id):
         connection: Connection | None = manager.active_connections.get(x_connection_id)
         if not connection or (connection and connection.nonce != x_nonce):
             raise HTTPException(status_code=401, detail="Invalid header credentials.")
