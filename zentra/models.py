@@ -1,3 +1,4 @@
+import datetime
 from typing import Literal
 
 from pydantic import Field, BaseModel
@@ -62,3 +63,12 @@ class ConversationMessages(BaseModel):
 
 class ConversationMessage(BaseModel):
     data: Message = Field(description="The latest message for this conversation.")
+
+
+class RateLimited(BaseModel):
+    retry_after: float = Field(
+        description="How many seconds before you can retry this route."
+    )
+    resets_at: datetime.datetime = Field(
+        description="The exact datetime this ratelimit expires."
+    )

@@ -2,10 +2,10 @@ import asyncio
 import json
 import secrets
 
+from cooldowns import Cooldown, CooldownBucket, CallableOnCooldown
 from fastapi import FastAPI, Path, Header, HTTPException
 from starlette.requests import Request
-from starlette.responses import Response
-from starlette.staticfiles import StaticFiles
+from starlette.responses import Response, JSONResponse
 from starlette.status import HTTP_204_NO_CONTENT
 from starlette.templating import Jinja2Templates
 from starlette.websockets import WebSocketDisconnect, WebSocket
@@ -24,22 +24,46 @@ from zentra import (
     ConversationIDs,
     ConversationMessages,
     ConversationMessage,
+    RateLimited,
 )
 
+authenticated_cooldown = Cooldown(10, 5, CooldownBucket.args)
 app = FastAPI(
     title="Zentra Backend",
     description="Messages are sorted in order based on ID, "
     "that is a message with an ID of 5 is newer then a message with an ID of 4.\n\n"
     "Message ID's are generated globally and not per conversation.",
+    responses={
+        429: {
+            "model": RateLimited,
+            "description": "You are currently being rate-limited.",
+        }
+    },
 )
 templates = Jinja2Templates(directory="templates")
 # app.mount("/static", StaticFiles(directory="static"), name="static")
 manager = ConnectionManager()
 
 
+@app.exception_handler(CallableOnCooldown)
+async def route_on_cooldown(request: Request, exc: CallableOnCooldown):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "retry_after": exc.retry_after,
+            "resets_at": exc.resets_at.isoformat(),
+        },
+    )
+
+
 @app.get("/", include_in_schema=False)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/expose")
+async def expose(request: Request):
+    return JSONResponse(status_code=200, content={"request_ip": request.client.host})
 
 
 @app.get(
@@ -125,20 +149,21 @@ async def send_message(
         default=None, description="Your websocket connections nonce."
     ),
 ):
-    connection: Connection | None = manager.active_connections.get(x_connection_id)
-    if not connection or (connection and connection.nonce != x_nonce):
-        raise HTTPException(status_code=401, detail="Invalid header credentials.")
+    async with authenticated_cooldown(x_nonce, x_connection_id):
+        connection: Connection | None = manager.active_connections.get(x_connection_id)
+        if not connection or (connection and connection.nonce != x_nonce):
+            raise HTTPException(status_code=401, detail="Invalid header credentials.")
 
-    message: Message = Message(
-        id=manager.next_message_id,
-        content=data.content,
-        sender_name=connection.name,
-        sender_id=connection.id,
-        conversation_id=conversation_id,
-    )
-    await manager.send_message_in_conversation(message)
+        message: Message = Message(
+            id=manager.next_message_id,
+            content=data.content,
+            sender_name=connection.name,
+            sender_id=connection.id,
+            conversation_id=conversation_id,
+        )
+        await manager.send_message_in_conversation(message)
 
-    return Response(status_code=HTTP_204_NO_CONTENT)
+        return Response(status_code=HTTP_204_NO_CONTENT)
 
 
 @app.get(
