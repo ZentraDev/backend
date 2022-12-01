@@ -179,7 +179,7 @@ async def send_message(
     ),
 ):
     # Message sending should have a harser ratelimit
-    # This is per connect client rather than IP as each 'person' should
+    # This is per connected client rather than IP as each 'person' should
     # in theory only be able to send so many messages at once
     async with authenticated_ratelimit(x_nonce, x_connection_id):
         connection: Connection | None = manager.active_connections.get(x_connection_id)
