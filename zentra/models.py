@@ -34,6 +34,7 @@ class WSPing(BaseModel):
 
 
 class WSMessageSendData(BaseModel):
+    id: int = Field(description="The ID of this message.")
     content: str = Field(description="The message content.")
     conversation_id: int = Field(
         description="The conversation this message is meant to be in."
@@ -41,7 +42,7 @@ class WSMessageSendData(BaseModel):
     sender_name: str = Field(
         description="The name of the person who sent this message."
     )
-    sender_connection_id: int = Field(
+    sender_id: int = Field(
         description="The connection id for the person who sent this message."
     )
 
