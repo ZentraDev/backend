@@ -32,6 +32,7 @@ global_ratelimit = Cooldown(25, 10, CooldownBucket.args)
 authenticated_ratelimit = Cooldown(10, 5, CooldownBucket.args)
 app = FastAPI(
     title="Zentra Backend",
+    version="0.2.0",
     description="Messages are sorted in order based on ID, "
     "that is a message with an ID of 5 is newer then a message with an ID of 4.\n\n"
     "Message ID's are generated globally and not per conversation.\n\n"
@@ -228,8 +229,8 @@ async def websocket_hello():
     name="ping event",
     description="Whenever this event is sent, it is expected the client responds. "
     "The response should be in the same format as provided, however, the `type` field "
-    "should instead be set to `PONG`\n\nFailure to respond as expected currently does nothing, "
-    "however it may prompt a force disconnection in the future.",
+    "should instead be set to `PONG`\n\nFailure to respond to two subsequent `PING` "
+    "events will result in a forceful disconnection.",
     tags=["Websocket"],
     response_model=WSPing,
 )
