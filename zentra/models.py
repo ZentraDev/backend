@@ -52,6 +52,16 @@ class WSMessageSend(BaseModel):
     data: WSMessageSendData
 
 
+class WSErrorData(BaseModel):
+    code: int = Field("The specific error code to handle accordingly.")
+    message: str = Field("A human readable message about the error.")
+
+
+class WSError(BaseModel):
+    type: Literal["ERROR"]
+    data: WSErrorData
+
+
 class ConversationIDs(BaseModel):
     data: list[int] = Field(description="A list of the current ids for conversations.")
 

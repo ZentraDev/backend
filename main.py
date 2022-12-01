@@ -1,6 +1,7 @@
 import asyncio
 import json
 import secrets
+from json import JSONDecodeError
 
 from cooldowns import Cooldown, CooldownBucket, CallableOnCooldown
 from fastapi import FastAPI, Path, Header, HTTPException
@@ -35,7 +36,10 @@ app = FastAPI(
     "that is a message with an ID of 5 is newer then a message with an ID of 4.\n\n"
     "Message ID's are generated globally and not per conversation.\n\n"
     "**Global Rate-limit**\n\nAll requests are rate-limited globally by client IP and "
-    "are throttled to 25 requests every 10 seconds.",
+    "are throttled to 25 requests every 10 seconds.\n\n\n"
+    """| One | Two | Three |
+|-----|-----|-------|
+| a   | b   | c     |""",
     responses={
         429: {
             "model": RateLimited,
@@ -262,7 +266,7 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
         try:
             current_ack = 0
             while True:
-                await asyncio.sleep(1)
+                await asyncio.sleep(5)
                 if websocket.client_state == WebSocketState.DISCONNECTED:
                     break
 
@@ -273,7 +277,20 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
                     }
                 )
                 data: str = await websocket.receive_text()
-                data: DataT = json.loads(data)
+                try:
+                    data: DataT = json.loads(data)
+                except JSONDecodeError:
+                    await websocket.send_json(
+                        {
+                            "type": "ERROR",
+                            "data": {
+                                "code": 1,
+                                "message": "Malformed JSON payload in PONG.",
+                            },
+                        }
+                    )
+                    continue
+
                 # TODO Do something with mis-responded pings?
                 if data.get("type") != "PONG":
                     print(f"ERROR    {connection.id} sent type {data['type']}")
