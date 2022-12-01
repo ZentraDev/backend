@@ -4,7 +4,7 @@ from dataclasses import asdict
 from itertools import count
 from typing import Dict
 
-from starlette.websockets import WebSocketDisconnect
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 from websockets.exceptions import ConnectionClosedOK
 
 from zentra import Connection, Message
@@ -45,7 +45,10 @@ class ConnectionManager:
         to_disconnect: list[Connection] = []
         for connection in self.active_connections.values():
             try:
-                await connection.websocket.send_json(packet)
+                if connection.websocket.client_state == WebSocketState.DISCONNECTED:
+                    to_disconnect.append(connection)
+                else:
+                    await connection.websocket.send_json(packet)
             except (WebSocketDisconnect, ConnectionClosedOK):
                 to_disconnect.append(connection)
 

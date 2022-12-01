@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 from starlette.status import HTTP_204_NO_CONTENT
 from starlette.templating import Jinja2Templates
-from starlette.websockets import WebSocketDisconnect, WebSocket
+from starlette.websockets import WebSocketDisconnect, WebSocket, WebSocketState
 from websockets.exceptions import ConnectionClosedOK
 
 from zentra import (
@@ -262,7 +262,10 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
         try:
             current_ack = 0
             while True:
-                await asyncio.sleep(30)
+                await asyncio.sleep(1)
+                if websocket.client_state == WebSocketState.DISCONNECTED:
+                    break
+
                 await websocket.send_json(
                     {
                         "type": "PING",
@@ -297,3 +300,5 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
             print(f"INFO:     {connection.id} disconnected")
     except Exception as e:
         raise e
+    else:
+        manager.disconnect(connection)
