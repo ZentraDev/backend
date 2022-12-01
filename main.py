@@ -37,9 +37,16 @@ app = FastAPI(
     "Message ID's are generated globally and not per conversation.\n\n"
     "**Global Rate-limit**\n\nAll requests are rate-limited globally by client IP and "
     "are throttled to 25 requests every 10 seconds.\n\n\n"
-    """| One | Two | Three |
-|-----|-----|-------|
-| a   | b   | c     |""",
+    "**WS Error Codes**\n\nThese can be served as the disconnect code or WS payload response."
+    """
+| Code | Location    | Description | 
+|------|-------------|-------------|
+| 4001 | WS Response | Your WS payload was not valid JSON   | 
+| 4002 | Close Code  | You failed to respond to the PING event correctly twice in a row |
+| 4003 | WS Response | Expected the `PONG` event and found something else |
+| 4004 | WS Response | WS payload does not conform to the expected data layout |
+| 4005 | WS Response | You sent the wrong ACK in your `PONG` event |
+""",
     responses={
         429: {
             "model": RateLimited,
@@ -265,7 +272,16 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
 
         try:
             current_ack = 0
+            has_missed_ping: bool = False
+            has_missed_ping_twice: bool = False
             while True:
+                if has_missed_ping_twice:
+                    await websocket.close(
+                        code=4002,
+                        reason="Missed PING event twice, please correct your mistake and reconnect.",
+                    )
+                    break
+
                 await asyncio.sleep(5)
                 if websocket.client_state == WebSocketState.DISCONNECTED:
                     break
@@ -284,16 +300,30 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
                         {
                             "type": "ERROR",
                             "data": {
-                                "code": 1,
-                                "message": "Malformed JSON payload in PONG.",
+                                "code": 4001,
+                                "message": "Malformed JSON payload.",
                             },
                         }
                     )
+                    if has_missed_ping:
+                        has_missed_ping_twice = True
+                    has_missed_ping = True
                     continue
 
-                # TODO Do something with mis-responded pings?
                 if data.get("type") != "PONG":
                     print(f"ERROR    {connection.id} sent type {data['type']}")
+                    await websocket.send_json(
+                        {
+                            "type": "ERROR",
+                            "data": {
+                                "code": 4003,
+                                "message": f"Expected PONG, found {data['type']}",
+                            },
+                        }
+                    )
+                    if has_missed_ping:
+                        has_missed_ping_twice = True
+                    has_missed_ping = True
                     continue
 
                 nested_data = data.get("data")
@@ -301,6 +331,18 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
                     print(
                         f"ERROR    {connection.id} failed to send the required data field"
                     )
+                    await websocket.send_json(
+                        {
+                            "type": "ERROR",
+                            "data": {
+                                "code": 4004,
+                                "message": f"Missing required data field.",
+                            },
+                        }
+                    )
+                    if has_missed_ping:
+                        has_missed_ping_twice = True
+                    has_missed_ping = True
                     continue
 
                 sent_ack = nested_data.get("ack")
@@ -308,9 +350,23 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
                     print(
                         f"ERROR    {connection.id} sent ack {sent_ack}, expected {current_ack}"
                     )
+                    await websocket.send_json(
+                        {
+                            "type": "ERROR",
+                            "data": {
+                                "code": 4005,
+                                "message": f"Expected ack {current_ack}, received {sent_ack}.",
+                            },
+                        }
+                    )
+                    if has_missed_ping:
+                        has_missed_ping_twice = True
+                    has_missed_ping = True
                     continue
 
                 current_ack += 1
+                has_missed_ping = False
+                has_missed_ping_twice = False
 
         except (WebSocketDisconnect, ConnectionClosedOK):
             manager.disconnect(connection)
