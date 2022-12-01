@@ -251,8 +251,8 @@ async def websocket_message():
 
 @app.websocket("/ws/{name}")
 async def websocket_endpoint(websocket: WebSocket, name: str):
+    conn_id = manager.next_connection_id
     try:
-        conn_id = manager.next_connection_id
         nonce = secrets.token_hex(32)
         connection: Connection = Connection(
             id=conn_id,
@@ -372,6 +372,7 @@ async def websocket_endpoint(websocket: WebSocket, name: str):
             manager.disconnect(connection)
             print(f"INFO:     {connection.id} disconnected")
     except Exception as e:
+        manager.active_connections.pop(conn_id, None)
         raise e
     else:
         manager.disconnect(connection)
